@@ -1,0 +1,8 @@
+{
+  "module": "zeitgeist_integration",
+  "class": "ZeitgeistIntegration",
+  "authors": "Agustín Carrasco <asermax@gmail.com>",
+  "version": "0.1",
+  "url": "https://github.com/asermax/ninja-ide-zeitgeist-integration",
+  "description": "This plugins helps integrate Ninja IDE with Zeitgeist."
+}
