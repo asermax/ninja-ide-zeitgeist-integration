@@ -1,6 +1,6 @@
 # -*- Mode: python; coding: utf-8; tab-width: 4; indent-tabs-mode: nil; -*-
 #
-# Copyright (C) 2012 - Agustin Carrasco
+# Copyright (C) 2012 - Agustín Carrasco
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,55 +23,80 @@ from zeitgeist.datamodel import *
 from ninja_ide.core import plugin
 
 class ZeitgeistIntegration(plugin.Plugin):
+    '''
+    Plugin that enables integration with the Zeitgeist Framework.
+    '''
+
     def initialize(self):
+        '''
+        Inicializes the Zeitgeist client and registers itself as a Zeitgeist
+        data source.
+        '''
         self.logger.info('Initialiazing zeitgeist plugin')
         editor = self.locator.get_service('editor')
-        editor.fileOpened.connect(self._zeitgeist_log)
+        editor.fileOpened.connect(self._zeitgeist_log_file_open)
 
         #initialize zeitgeist client
         self.zeitgeist = ZeitgeistClient()
         self._register_data_source()
 
     def finish(self):
+        '''
+        Deletes the reference to the Zeitgeist client.
+        '''
         # remove zeitgeist client
         del self.zeitgeist
 
         self.logger.info('Shutting down zeitgeist plugin')
 
     def _register_data_source(self):
+        '''
+        Registers the plugin as a Zeitgeist data source.
+        '''
         unique_id = 'org.ninja.ide'
         name = 'Ninja IDE'
         description = 'Very versatile Python IDE'
 
-        # Describe what sort of events will be inserted (optional)
-        subject_template = Subject()
-        subject_template.interpretation = Interpretation.DOCUMENT. \
-        TEXT_DOCUMENT.PLAIN_TEXT_DOCUMENT.SOURCE_CODE
-        subject_template.manifestation = Manifestation.FILE_DATA_OBJECT
+        # Describe what sort of events will be inserted
         templates = []
         for interp in (Interpretation.EVENT_INTERPRETATION.ACCESS_EVENT,
             Interpretation.EVENT_INTERPRETATION.MODIFY_EVENT,
             Interpretation.EVENT_INTERPRETATION.LEAVE_EVENT,
             Interpretation.EVENT_INTERPRETATION.CREATE_EVENT):
+
             event_template = Event()
             event_template.interpretation = interp
             event_template.manifestation = Manifestation.USER_ACTIVITY
-            event_template.append_subject(subject_template)
+
+            for subj_interp in (Interpretation.DOCUMENT.TEXT_DOCUMENT.
+                PLAIN_TEXT_DOCUMENT.SOURCE_CODE,
+                Interpretation.DOCUMENT.TEXT_DOCUMENT.PLAIN_TEXT_DOCUMENT):
+
+                subject_template = Subject()
+                subject_template.interpretation = subj_interp
+                subject_template.manifestation = Manifestation.FILE_DATA_OBJECT
+                event_template.append_subject(subject_template)
+
             templates.append(event_template)
 
         self.zeitgeist.register_data_source(unique_id, name, description,
             templates)
 
-    def _zeitgeist_log(self, fileName):
+    def _zeitgeist_log_file_open(self, fileName):
+        '''
+        Registers an event everytime Ninja IDE opens a file.
+        '''
         self.logger.info('Inserting event for %s' % fileName)
+
+        mimetype = 'text/x-python' if fileName.split('.')[-1] == 'py' \
+            else 'text/plain'
+
+        print mimetype
 
         subject = Subject.new_for_values(
             uri='file://%s' % unicode(fileName),
-            interpretation=Interpretation.DOCUMENT.TEXT_DOCUMENT.
-            PLAIN_TEXT_DOCUMENT.SOURCE_CODE,
-            manifestation=Manifestation.FILE_DATA_OBJECT,
             origin='file://%s' % path.dirname(unicode(fileName)),
-            mimetype='text/x-python',
+            mimetype=mimetype,
             text=path.basename(unicode(fileName)))
         event = Event.new_for_values(
             timestamp=int(time.time() * 1000),
