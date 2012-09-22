@@ -22,6 +22,7 @@ from zeitgeist.datamodel import *
 
 from ninja_ide.core import plugin
 
+
 class ZeitgeistIntegration(plugin.Plugin):
     '''
     Plugin that enables integration with the Zeitgeist Framework.
@@ -35,6 +36,7 @@ class ZeitgeistIntegration(plugin.Plugin):
         self.logger.info('Initialiazing zeitgeist plugin')
         editor = self.locator.get_service('editor')
         editor.fileOpened.connect(self._zeitgeist_log_file_open)
+        editor.fileSaved.connect(self._zeitgeist_log_file_modified)
 
         #initialize zeitgeist client
         self.zeitgeist = ZeitgeistClient()
@@ -82,25 +84,21 @@ class ZeitgeistIntegration(plugin.Plugin):
         self.zeitgeist.register_data_source(unique_id, name, description,
             templates)
 
-    def _zeitgeist_log_file_open(self, fileName):
+    def _zeitgeist_log_event(self, fileName, interpretation):
         '''
-        Registers an event everytime Ninja IDE opens a file.
+        Registers an event over the file with a given interpretation.
         '''
+        fileName = unicode(fileName)
+
         self.logger.info('Inserting event for %s' % fileName)
 
-        mimetype = 'text/x-python' if fileName.split('.')[-1] == 'py' \
-            else 'text/plain'
-
-        print mimetype
-
         subject = Subject.new_for_values(
-            uri='file://%s' % unicode(fileName),
-            origin='file://%s' % path.dirname(unicode(fileName)),
-            mimetype=mimetype,
-            text=path.basename(unicode(fileName)))
+            uri='file://%s' % fileName,
+            origin='file://%s' % path.dirname(fileName),
+            text=path.basename(fileName))
         event = Event.new_for_values(
             timestamp=int(time.time() * 1000),
-            interpretation=Interpretation.EVENT_INTERPRETATION.ACCESS_EVENT,
+            interpretation=interpretation,
             manifestation=Manifestation.USER_ACTIVITY,
             actor='application://ninja-ide.desktop',
             subjects=[subject])
@@ -110,3 +108,17 @@ class ZeitgeistIntegration(plugin.Plugin):
                 'Logged %r with event id %d.' % (fileName, event_ids[0]))
 
         self.zeitgeist.insert_events([event], on_id_received)
+
+    def _zeitgeist_log_file_open(self, fileName):
+        '''
+        Registers an event everytime Ninja IDE opens a file.
+        '''
+        self._zeitgeist_log_event(unicode(fileName),
+            Interpretation.EVENT_INTERPRETATION.ACCESS_EVENT)
+
+    def _zeitgeist_log_file_modified(self, fileName):
+        '''
+        Registers an event everytime Ninja IDE modifies a file.
+        '''
+        self._zeitgeist_log_event(unicode(fileName),
+            Interpretation.EVENT_INTERPRETATION.MODIFY_EVENT)
